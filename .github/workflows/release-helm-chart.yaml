@@ -37,7 +37,7 @@ jobs:
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          charts_dir: .
+          charts_dir: charts
           pages_branch: gh-pages
           # You can set a custom charts_repo_url if you use a custom domain:
           # charts_repo_url: https://<your-domain>/helm
