@@ -1,2 +1,129 @@
 # planetiler-openmaptiles-helm-chart
-Helm chart to run planetiler-openmaptiles as a job
+
+Helm chart to run https://github.com/openmaptiles/planetiler-openmaptiles as a Kubernetes CronJob.
+
+This chart lets you schedule recurring OpenMapTiles planetiler builds. It supports persistent storage for outputs, configurable env vars, and common Kubernetes options (resources, tolerations, node selectors, etc.).
+
+## Prerequisites
+- Kubernetes 1.23+ (CronJob `batch/v1`)
+- Helm 3.8+
+- PersistentVolume provisioner if you enable persistence (default: enabled)
+- Optional: Kubernetes 1.27+ if you want to set a `timeZone` for the schedule
+
+## Quick start
+Install with defaults (runs weekly on Monday at 06:00 UTC, creates a PVC named `<release>-planetiler-openmaptiles-data` and mounts it at `/data`).
+
+Upstream recommends CLI flags. This chart defaults to `--force --download`. To build a small example area (Monaco):
+
+```bash
+helm install tiles ./ -n tiles --create-namespace \
+  --set area=monaco
+```
+
+- You can target other areas similarly, e.g. `--set area=liechtenstein`.
+- Prefer the `area` value to avoid shell quoting issues in zsh.
+- To provide your own PBF instead of a named area, either set the appropriate upstream flag in `args` (see image docs) or use env vars like `env.DOWNLOAD_PBF_URL` if you prefer.
+
+If you still want to manipulate the raw `args` list, here are zsh‑safe options:
+- Quote the whole expression: `--set-string 'args[2]=--area=monaco'`
+- Escape brackets: `--set-string args\[2\]=--area=monaco`
+- Disable globbing for that command: `noglob helm install ... --set-string args[2]=--area=monaco`
+- Or set the entire array at once (Helm ≥ 3.12): `--set-json args='["--force","--download","--area=monaco"]'`
+
+Check the CronJob and jobs:
+```bash
+kubectl -n tiles get cronjob
+kubectl -n tiles get jobs
+```
+
+See recent job logs:
+```bash
+kubectl -n tiles logs -l job-name=$(kubectl -n tiles get jobs --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].metadata.name}') --tail=200
+```
+
+### Manual trigger (run immediately)
+If you want to start a job now without waiting for the next schedule:
+```bash
+kubectl -n tiles create job --from=cronjob/tiles manual-$(date +%s)
+```
+Replace `tiles` with your release name if different. The suffix ensures a unique Job name.
+
+Outputs will be written under `/data` in the container. Use a `StorageClass` that fits your cluster.
+
+## Configuration
+Common values you may want to set:
+
+- `image.repository` (default `openmaptiles/planetiler-openmaptiles`)
+- `image.tag` (defaults to the Chart's appVersion)
+- `cronjob.schedule` (default `"0 6 * * 1"` — Mondays 06:00 UTC)
+- `cronjob.timezone` (requires k8s >= 1.27)
+- `env` map to pass configuration to the image (examples below)
+- `persistence.*` to configure the PVC and mount path (default mount `/data`)
+- `resources` for CPU/memory
+
+### Example: Europe/Berlin extract daily at 01:15 Berlin time
+```bash
+helm upgrade --install tiles ./ -n tiles \
+  --set cronjob.schedule="15 1 * * *" \
+  --set cronjob.timezone="Europe/Berlin" \
+  --set env.DOWNLOAD_PBF_URL=https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf \
+  --set resources.requests.cpu=2 \
+  --set resources.requests.memory=8Gi \
+  --set resources.limits.cpu=8 \
+  --set resources.limits.memory=32Gi
+```
+
+### Example values.yaml
+```yaml
+image:
+  repository: ghcr.io/openmaptiles/planetiler-openmaptiles
+  tag: latest
+  pullPolicy: IfNotPresent
+
+cronjob:
+  schedule: "0 6 * * 1"   # Mondays 06:00 UTC
+  timezone: ""
+  concurrencyPolicy: Forbid
+
+# Environment passed to the container. Consult the upstream image for supported keys.
+# Common examples:
+# - DOWNLOAD_PBF_URL: the source PBF to build from
+# - MIN_ZOOM / MAX_ZOOM: zoom range to generate
+# - AREA: optional bounding polygon
+# - TILE_PATH, DATA_DIR, etc.
+env:
+  DOWNLOAD_PBF_URL: https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf
+
+persistence:
+  enabled: true
+  storageClassName: ""
+  accessModes: [ReadWriteOnce]
+  size: 100Gi
+  mountPath: /data
+```
+
+### Persistence
+- By default, the chart creates a PVC named `<release>-planetiler-openmaptiles-data` and mounts it at `/data`.
+- To use an existing claim, set `persistence.existingClaim` and the chart will not create a new PVC.
+
+### ServiceAccount
+- The chart creates a dedicated ServiceAccount by default. To reuse an existing one:
+  - `serviceAccount.create=false`
+  - `serviceAccount.name=<your-sa>`
+
+### Overriding command/args
+If you need to override the container entrypoint or arguments:
+```yaml
+command: ["/bin/sh", "-lc"]
+args: ["planetiler --help"]
+```
+
+### Uninstall
+```bash
+helm uninstall tiles -n tiles
+```
+
+If you let the chart create the PVC, it remains after uninstall by default. Delete it explicitly if desired:
+```bash
+kubectl -n tiles delete pvc tiles-planetiler-openmaptiles-data
+```

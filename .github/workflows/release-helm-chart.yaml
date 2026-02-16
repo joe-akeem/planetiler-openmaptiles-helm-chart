@@ -1,0 +1,43 @@
+name: Release Helm Chart to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+    # You can also release only on tags by uncommenting:
+    # tags:
+    #   - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write  # needed to create releases and push to gh-pages
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # chart-releaser needs full history/tags
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Packages charts, creates GitHub Releases for new versions,
+      # and updates/creates the index.yaml on the gh-pages branch.
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          charts_dir: .
+          pages_branch: gh-pages
+          # You can set a custom charts_repo_url if you use a custom domain:
+          # charts_repo_url: https://<your-domain>/helm

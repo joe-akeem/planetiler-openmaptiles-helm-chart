@@ -1,0 +1,18 @@
+apiVersion: v2
+name: planetiler-openmaptiles
+description: Helm chart to run planetiler-openmaptiles as a Kubernetes CronJob
+home: https://github.com/openmaptiles/planetiler-openmaptiles
+sources:
+  - https://github.com/openmaptiles/planetiler-openmaptiles
+  - https://github.com/joachim/planetiler-openmaptiles-helm-chart
+keywords:
+  - planetiler
+  - openmaptiles
+  - osm
+  - cronjob
+  - tiles
+  - vector-tiles
+kubeVersion: ">=1.23.0-0"
+type: application
+version: 0.1.0
+appVersion: "3.16"

@@ -1,0 +1,118 @@
+# Default values for planetiler-openmaptiles Helm chart.
+# This is a YAML-formatted file.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: openmaptiles/planetiler-openmaptiles
+#  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+# - name: my-registry-secret
+
+cronjob:
+  schedule: "0 6 * * 1"  # Every Monday at 06:00 UTC (weekly)
+  timezone: ""           # e.g. Europe/Berlin (requires k8s >= 1.27)
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: null
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  suspend: false
+  ttlSecondsAfterFinished: null
+
+job:
+  backoffLimit: 0
+  activeDeadlineSeconds: null
+  ttlSecondsAfterFinished: null
+  annotations: {}
+  labels: {}
+
+podAnnotations: {}
+podLabels: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+securityContext:
+  # Pod-level security context
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  enabled: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: false
+
+resources:
+  limits: {}
+  requests: {}
+  # Example:
+  # limits:
+  #   cpu: 8
+  #   memory: 32Gi
+  # requests:
+  #   cpu: 2
+  #   memory: 8Gi
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
+# Configure environment variables for the container
+# NOTE: Upstream recommends CLI flags (see `.values.args`) like `--force --download --area=monaco`.
+# Env vars are kept for compatibility but are not required.
+env: {}
+#  DOWNLOAD_PBF_URL: https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf
+#  MIN_ZOOM: "0"
+#  MAX_ZOOM: "14"
+
+# Additional envFrom sources (ConfigMap/Secret refs)
+envFrom: []
+# - configMapRef:
+#     name: my-config
+# - secretRef:
+#     name: my-secret
+
+# Command/args override if needed
+command: []
+# Default to the official recommended flags
+args:
+  - --force
+  - --download
+# Optional convenience: append an area without dealing with shell quoting
+area: ""  # e.g. monaco, liechtenstein; when set, appends --area=<value> to args
+# Additional arguments to append after defaults and optional area
+extraArgs: []
+
+# Persistence for output tiles/data
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 100Gi
+  mountPath: /data
+  annotations: {}
+
+# Additional volumes and mounts
+extraVolumeMounts: []
+extraVolumes: []
+
+# PriorityClassName, DNS, hostAliases etc.
+priorityClassName: ""
+hostAliases: []
+dnsPolicy: ""
+dnsConfig: {}

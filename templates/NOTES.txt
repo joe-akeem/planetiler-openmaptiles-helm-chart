@@ -1,0 +1,21 @@
+Thank you for installing the planetiler-openmaptiles CronJob chart!
+
+This chart creates:
+- A CronJob named: {{ include "planetiler-openmaptiles.fullname" . }}
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+- A PersistentVolumeClaim named: {{ include "planetiler-openmaptiles.fullname" . }}-data
+{{- end }}
+
+To list the CronJob:
+  kubectl -n {{ .Release.Namespace }} get cronjob {{ include "planetiler-openmaptiles.fullname" . }}
+
+To see the Jobs spawned by the CronJob:
+  kubectl -n {{ .Release.Namespace }} get jobs -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name={{ include "planetiler-openmaptiles.name" . }}
+
+To trigger a Job run immediately (manual run):
+  kubectl -n {{ .Release.Namespace }} create job --from=cronjob/{{ include "planetiler-openmaptiles.fullname" . }} manual-$(date +%s)
+
+To see logs of the most recent Job's pod:
+  kubectl -n {{ .Release.Namespace }} logs -l job-name=$(kubectl -n {{ .Release.Namespace }} get jobs --sort-by=.metadata.creationTimestamp -o jsonpath='{\x2Eitems[-1:].metadata.name}') --tail=200
+
+If you enabled persistence, the output will be available at the mounted path inside the container (default {{ .Values.persistence.mountPath }}).
