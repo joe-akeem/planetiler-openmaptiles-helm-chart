@@ -91,7 +91,7 @@ command: []
 args:
   - --force
   - --download
-  - --output=/data/tiles.mtiles
+  - --output=/data/tiles.mbtiles
 # Optional convenience: append an area without dealing with shell quoting
 area: ""  # e.g. monaco, liechtenstein; when set, appends --area=<value> to args
 # Additional arguments to append after defaults and optional area
