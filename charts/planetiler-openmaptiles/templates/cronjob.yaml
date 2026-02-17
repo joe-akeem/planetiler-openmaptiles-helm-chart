@@ -84,10 +84,6 @@ spec:
                 capabilities:
                   {{- toYaml .Values.containerSecurityContext.capabilities | nindent 18 }}
               {{- end }}
-              {{- with .Values.command }}
-              command:
-                {{- toYaml . | nindent 16 }}
-              {{- end }}
               {{- /* Compose args: base .Values.args, optional --area, then .Values.extraArgs */}}
               {{- $args := .Values.args | default (list) -}}
               {{- if .Values.area }}
@@ -96,9 +92,20 @@ spec:
               {{- if .Values.extraArgs }}
               {{- $args = concat $args .Values.extraArgs -}}
               {{- end }}
+              {{- /* If postMove.enabled and no custom command override, wrap with sh -lc to run build then mv -f */}}
+              {{- if and .Values.postMove.enabled (not .Values.command) }}
+              command: ["/bin/sh", "-lc"]
+              args:
+                - {{ printf "%s %s && mv -f %s %s" .Values.postMove.runBin (join " " $args) .Values.postMove.from .Values.postMove.to | quote }}
+              {{- else }}
+              {{- with .Values.command }}
+              command:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
               {{- with $args }}
               args:
                 {{- toYaml . | nindent 16 }}
+              {{- end }}
               {{- end }}
               {{- if gt (len .Values.env) 0 }}
               env:
