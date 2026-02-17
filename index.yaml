@@ -3,6 +3,28 @@ entries:
   planetiler-openmaptiles:
   - apiVersion: v2
     appVersion: "3.16"
+    created: "2026-02-17T20:38:15.105911476Z"
+    description: Helm chart to run planetiler-openmaptiles as a Kubernetes CronJob
+    digest: ee11cc704a904a68ff670d72a7d90cd4aa5ae9ac8a073daaec251e69327cbead
+    home: https://github.com/openmaptiles/planetiler-openmaptiles
+    keywords:
+    - planetiler
+    - openmaptiles
+    - osm
+    - cronjob
+    - tiles
+    - vector-tiles
+    kubeVersion: '>=1.23.0-0'
+    name: planetiler-openmaptiles
+    sources:
+    - https://github.com/openmaptiles/planetiler-openmaptiles
+    - https://github.com/joachim/planetiler-openmaptiles-helm-chart
+    type: application
+    urls:
+    - https://github.com/joe-akeem/planetiler-openmaptiles-helm-chart/releases/download/planetiler-openmaptiles-0.3.0/planetiler-openmaptiles-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v2
+    appVersion: "3.16"
     created: "2026-02-17T19:56:23.553793851Z"
     description: Helm chart to run planetiler-openmaptiles as a Kubernetes CronJob
     digest: 2beffce3080eaa56c61e56af0ae3c7f140634830aa8287bbde6bdaf9cf673ca2
@@ -67,4 +89,4 @@ entries:
     urls:
     - https://github.com/joe-akeem/planetiler-openmaptiles-helm-chart/releases/download/planetiler-openmaptiles-0.1.0/planetiler-openmaptiles-0.1.0.tgz
     version: 0.1.0
-generated: "2026-02-17T19:56:23.553812256Z"
+generated: "2026-02-17T20:38:15.10592738Z"
