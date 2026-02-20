@@ -76,12 +76,7 @@ spec:
           {{- if .Values.extraArgs }}
           {{- $args = concat $args .Values.extraArgs -}}
           {{- end }}
-          {{- /* If postMove.enabled and no custom command override, wrap with sh -lc to run build then mv -f */}}
-          {{- if and .Values.postMove.enabled (not .Values.command) }}
-          command: ["/bin/sh", "-lc"]
-          args:
-            - {{ printf "%s %s && mv -f %s %s" .Values.postMove.runBin (join " " $args) .Values.postMove.from .Values.postMove.to | quote }}
-          {{- else }}
+          {{- /* Render command/args normally; no post-move wrapping */}}
           {{- with .Values.command }}
           command:
             {{- toYaml . | nindent 12 }}
@@ -89,7 +84,6 @@ spec:
           {{- with $args }}
           args:
             {{- toYaml . | nindent 12 }}
-          {{- end }}
           {{- end }}
           {{- if gt (len .Values.env) 0 }}
           env:

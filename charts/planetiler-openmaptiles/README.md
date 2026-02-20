@@ -73,7 +73,6 @@ Common values you may want to set:
 - `image.tag` (defaults to the Chart's appVersion)
 - `env` map to pass configuration to the image (examples below)
 - `args` default CLI flags, `area`, and `extraArgs`
-- `postMove.*` optional post-processing to move/rename the generated file
 - `persistence.*` to configure the PVC and mount path (default mount `/data`)
 - `resources` for CPU/memory
 - `job.*` options: `backoffLimit`, `activeDeadlineSeconds`, `ttlSecondsAfterFinished`, `annotations`, `labels`
@@ -100,11 +99,8 @@ area: "monaco" # convenience: appends --area=monaco to args
 env:
   DOWNLOAD_PBF_URL: https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf
 
-postMove:
-  enabled: true
-  from: "/data/output.mbtiles"
-  to: "/data/tiles.mbtiles"
-  runBin: "planetiler"
+# To write directly to the final filename, set the output flag accordingly in args:
+#   - --output=/data/tiles.mbtiles
 
 persistence:
   enabled: true
