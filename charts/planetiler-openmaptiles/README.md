@@ -1,8 +1,8 @@
 # planetiler-openmaptiles-helm-chart
 
-Helm chart to run https://github.com/openmaptiles/planetiler-openmaptiles as a Kubernetes Job executed by Helm hooks.
+Helm chart to run https://github.com/openmaptiles/planetiler-openmaptiles as a Kubernetes Job.
 
-This chart builds OpenMapTiles with Planetiler and writes outputs to persistent storage. The Job is triggered automatically on every `helm install` and `helm upgrade` via Helm hooks (`post-install,post-upgrade`). It supports configurable env vars/args, security contexts, resources, tolerations, node selectors, and PVCs.
+This chart builds OpenMapTiles with Planetiler and writes outputs to persistent storage. A new non-blocking Job is created on every `helm install` and `helm upgrade` (using the Helm release revision in the name). Helm returns immediately after creating the Job; Kubernetes runs it to completion. It supports configurable env vars/args, security contexts, resources, tolerations, node selectors, and PVCs.
 
 ## Prerequisites
 - Kubernetes 1.21+ (Job `batch/v1`)
@@ -30,42 +30,39 @@ If you still want to manipulate the raw `args` list, here are zsh‑safe options
 - Or set the entire array at once (Helm ≥ 3.12): `--set-json args='["--force","--download","--area=monaco"]'`
 
 ### What runs when
-- On `helm install`: a one-off Job runs after all regular resources are created (PVC, ServiceAccount, etc.).
-- On `helm upgrade`: the Job runs again with the updated values.
+- On `helm install`: Helm creates a normal Kubernetes Job as part of the release and returns immediately.
+- On `helm upgrade`: Helm creates a new Job again (the name includes the Helm release revision like `...-r<N>`), and returns immediately.
 
-By default the hook has `helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded`, which:
-- Removes any previous hook Job before a new one is created to avoid name conflicts.
-- Cleans up a successful run (the Pod and Job are removed). You can change this behavior; see Debug/Keep resources below.
+Notes:
+- Because these Jobs are not hooks, Helm does not wait for them to finish and will not fail the release if the Job later fails. Monitor the Job status/logs with `kubectl`.
+- To auto-clean up finished Jobs/Pods, set `job.ttlSecondsAfterFinished`. Otherwise, historical Jobs remain until you delete them.
 
 ### Observability
 List Jobs and related Pods for a release:
 ```bash
 kubectl -n tiles get jobs -l app.kubernetes.io/instance=tiles
-kubectl -n tiles get pods -l job-name=$(kubectl -n tiles get job tiles-planetiler-openmaptiles -o jsonpath='{.metadata.name}')
+# Get the most recent Job name for this release
+JOB=$(kubectl -n tiles get jobs -l app.kubernetes.io/instance=tiles \
+  --sort-by=.status.startTime -o jsonpath='{.items[-1].metadata.name}')
+kubectl -n tiles get pods -l job-name=${JOB}
 ```
 
-Tail logs of the latest Pod created by the Job:
+Tail logs of the latest Pod created by the most recent Job:
 ```bash
-kubectl -n tiles logs --tail=200 -l app.kubernetes.io/instance=tiles --selector=job-name=tiles-planetiler-openmaptiles
+kubectl -n tiles logs --tail=200 -l app.kubernetes.io/instance=tiles --selector=job-name=${JOB}
 ```
-
-Note: Because successful hook Jobs are cleaned up by default, fetch logs while the Job is running, or disable the cleanup as shown below.
 
 ### Re-run the Job manually
-Because this is a Helm hook Job, it is triggered by Helm actions. To run it again without changing chart contents:
-- `helm upgrade tiles ./ -n tiles --reuse-values` (re-applies the chart and re-triggers the hook), or
-- Change a no-op value (e.g., `--set dummy=$(date +%s)`) and upgrade, or
-- Uninstall/install the release.
+This chart creates a new Job on each Helm action. To run it again without changing values:
+- `helm upgrade tiles ./ -n tiles --reuse-values`
+- Or change a no-op value (e.g., `--set dummy=$(date +%s)`) and upgrade
+- Or uninstall/install the release
 
 If you prefer ad-hoc Jobs independent of Helm, you can create your own `Job` referencing the same image/args and PVC.
 
-### Keep hook Job/Pods for debugging
-To retain resources after success, override the delete policy:
-```bash
-helm upgrade --install tiles ./ -n tiles \
-  --set-json 'job.annotations={"helm.sh/hook-delete-policy":"before-hook-creation"}'
-```
-You can also remove `before-hook-creation` if you want to keep historical Jobs and avoid automatic cleanup entirely. Be aware you must then manage unique names yourself; this chart’s hook Job name is static (`<release>-planetiler-openmaptiles`).
+### Optional cleanup/retention
+- Set `job.ttlSecondsAfterFinished` to let Kubernetes auto-delete finished Jobs/Pods.
+- Or leave it null to keep historical Jobs/Pods until you delete them manually.
 
 Outputs will be written under `/data` in the container. Use a `StorageClass` that fits your cluster.
 
@@ -125,7 +122,7 @@ job:
 ```
 
 ### Deprecation notice about former CronJob settings
-- The chart previously created a `CronJob`. It now creates a one-off `Job` executed via Helm hooks on install/upgrade.
+- The chart previously created a `CronJob`, then a hook‑driven one‑off `Job`. It now creates a normal non‑blocking `Job` per install/upgrade (no Helm hooks).
 - Values under `cronjob.*` are ignored by the current templates. They are kept for backward compatibility for now and may be removed in a future major release.
 
 ### Persistence

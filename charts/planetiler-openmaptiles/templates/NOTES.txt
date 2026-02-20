@@ -1,30 +1,32 @@
 Thank you for installing the planetiler-openmaptiles chart!
 
-This chart now runs a one-off Kubernetes Job executed by Helm hooks on every install and upgrade.
+This chart runs a one-off Kubernetes Job on every install and upgrade. It is rendered as a normal resource (no Helm hooks), so Helm does not wait for it to finish.
 
 This chart creates:
-- A Job (hook) named: {{ include "planetiler-openmaptiles.fullname" . }}
+- A Job named with the release revision: {{ include "planetiler-openmaptiles.fullname" . }}-r{{ .Release.Revision }}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
 - A PersistentVolumeClaim named: {{ include "planetiler-openmaptiles.fullname" . }}-data
 {{- end }}
 
 What happens when you install/upgrade:
-- A post-install/post-upgrade Helm hook creates and runs the Job after regular resources are ready.
-- By default, successful hook Jobs/Pods are cleaned up (`helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded`).
+- Helm applies a new Job for each release revision and returns immediately.
+- Kubernetes runs the Job to completion in the background.
 
 Observe the Job and Pods:
   kubectl -n {{ .Release.Namespace }} get jobs -l app.kubernetes.io/instance={{ .Release.Name }}
-  kubectl -n {{ .Release.Namespace }} get pods -l job-name={{ include "planetiler-openmaptiles.fullname" . }}
+  # Get the most recent Job name for this release
+  JOB=$(kubectl -n {{ .Release.Namespace }} get jobs -l app.kubernetes.io/instance={{ .Release.Name }} \
+    --sort-by=.status.startTime -o jsonpath='{.items[-1].metadata.name}')
+  kubectl -n {{ .Release.Namespace }} get pods -l job-name=${JOB}
 
 Tail logs (while the Job is running):
-  kubectl -n {{ .Release.Namespace }} logs --tail=200 -l app.kubernetes.io/instance={{ .Release.Name }} --selector=job-name={{ include "planetiler-openmaptiles.fullname" . }}
+  kubectl -n {{ .Release.Namespace }} logs --tail=200 -l app.kubernetes.io/instance={{ .Release.Name }} --selector=job-name=${JOB}
 
-Re-run the Job via Helm (without changing values):
+Re-run the Job via Helm (creates a new revision and hence a new Job):
   helm upgrade {{ .Release.Name }} {{ .Chart.Name }} -n {{ .Release.Namespace }} --reuse-values
 
-Keep hook resources for debugging (optional):
-  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} -n {{ .Release.Namespace }} \
-    --reuse-values \
-    --set-json 'job.annotations={"helm.sh/hook-delete-policy":"before-hook-creation"}'
+Optional cleanup/retention:
+- Set `job.ttlSecondsAfterFinished` to let Kubernetes auto-delete finished Jobs/Pods.
+- Or leave it null to keep historical Jobs/Pods until you delete them manually.
 
 If you enabled persistence, outputs will be written under the mounted path inside the container (default {{ .Values.persistence.mountPath }}).

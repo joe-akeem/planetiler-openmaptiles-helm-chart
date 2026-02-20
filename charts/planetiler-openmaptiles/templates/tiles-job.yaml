@@ -1,15 +1,13 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "planetiler-openmaptiles.fullname" . }}
+  name: {{ include "planetiler-openmaptiles.fullname" . }}-r{{ .Release.Revision }}
   labels:
     {{- include "planetiler-openmaptiles.labels" . | nindent 4 }}
+  {{- with .Values.job.annotations }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-    {{- with .Values.job.annotations }}
     {{- toYaml . | nindent 4 }}
-    {{- end }}
+  {{- end }}
 spec:
   {{- with .Values.job.activeDeadlineSeconds }}
   activeDeadlineSeconds: {{ . }}
