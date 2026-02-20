@@ -1,21 +1,30 @@
-Thank you for installing the planetiler-openmaptiles CronJob chart!
+Thank you for installing the planetiler-openmaptiles chart!
+
+This chart now runs a one-off Kubernetes Job executed by Helm hooks on every install and upgrade.
 
 This chart creates:
-- A CronJob named: {{ include "planetiler-openmaptiles.fullname" . }}
+- A Job (hook) named: {{ include "planetiler-openmaptiles.fullname" . }}
 {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
 - A PersistentVolumeClaim named: {{ include "planetiler-openmaptiles.fullname" . }}-data
 {{- end }}
 
-To list the CronJob:
-  kubectl -n {{ .Release.Namespace }} get cronjob {{ include "planetiler-openmaptiles.fullname" . }}
+What happens when you install/upgrade:
+- A post-install/post-upgrade Helm hook creates and runs the Job after regular resources are ready.
+- By default, successful hook Jobs/Pods are cleaned up (`helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded`).
 
-To see the Jobs spawned by the CronJob:
-  kubectl -n {{ .Release.Namespace }} get jobs -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name={{ include "planetiler-openmaptiles.name" . }}
+Observe the Job and Pods:
+  kubectl -n {{ .Release.Namespace }} get jobs -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl -n {{ .Release.Namespace }} get pods -l job-name={{ include "planetiler-openmaptiles.fullname" . }}
 
-To trigger a Job run immediately (manual run):
-  kubectl -n {{ .Release.Namespace }} create job --from=cronjob/{{ include "planetiler-openmaptiles.fullname" . }} manual-$(date +%s)
+Tail logs (while the Job is running):
+  kubectl -n {{ .Release.Namespace }} logs --tail=200 -l app.kubernetes.io/instance={{ .Release.Name }} --selector=job-name={{ include "planetiler-openmaptiles.fullname" . }}
 
-To see logs of the most recent Job's pod:
-  kubectl -n {{ .Release.Namespace }} logs -l job-name=$(kubectl -n {{ .Release.Namespace }} get jobs --sort-by=.metadata.creationTimestamp -o jsonpath='{\x2Eitems[-1:].metadata.name}') --tail=200
+Re-run the Job via Helm (without changing values):
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} -n {{ .Release.Namespace }} --reuse-values
 
-If you enabled persistence, the output will be available at the mounted path inside the container (default {{ .Values.persistence.mountPath }}).
+Keep hook resources for debugging (optional):
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} -n {{ .Release.Namespace }} \
+    --reuse-values \
+    --set-json 'job.annotations={"helm.sh/hook-delete-policy":"before-hook-creation"}'
+
+If you enabled persistence, outputs will be written under the mounted path inside the container (default {{ .Values.persistence.mountPath }}).
