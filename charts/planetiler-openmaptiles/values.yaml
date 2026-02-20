@@ -12,17 +12,8 @@ image:
 imagePullSecrets: []
 # - name: my-registry-secret
 
-cronjob:
-  schedule: "0 6 * * 1"  # Every Monday at 06:00 UTC (weekly)
-  timezone: ""           # e.g. Europe/Berlin (requires k8s >= 1.27)
-  concurrencyPolicy: Forbid
-  startingDeadlineSeconds: null
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 1
-  suspend: false
-  ttlSecondsAfterFinished: null
-
 job:
+  enabled: true
   backoffLimit: 0
   activeDeadlineSeconds: null
   ttlSecondsAfterFinished: null
@@ -58,13 +49,20 @@ containerSecurityContext:
 resources:
   limits: {}
   requests: {}
-  # Example:
+  # Sizing guidance (starting points; adjust to your cluster/area/zoom):
+  # - Tiny demo (e.g., monaco): requests {cpu: 2,  memory:  8Gi}, limits {cpu: 4,  memory: 16Gi}
+  # - Small city/region:         requests {cpu: 4,  memory: 16Gi}, limits {cpu: 8,  memory: 32Gi}
+  # - Medium country:            requests {cpu: 8,  memory: 32Gi}, limits {cpu:16,  memory: 64Gi}
+  # - Large region:              requests {cpu:16,  memory: 64Gi}, limits {cpu:32,  memory:128Gi}
+  # - Whole planet:              requests {cpu:32,  memory:128Gi}, limits {cpu:64,  memory:256Gi}
+  # Example explicit resources:
   # limits:
   #   cpu: 8
   #   memory: 32Gi
   # requests:
-  #   cpu: 2
-  #   memory: 8Gi
+  #   cpu: 4
+  #   memory: 16Gi
+  # Tip: For batch Jobs consider setting requests == limits to get Guaranteed QoS.
 
 nodeSelector: {}
 affinity: {}
@@ -107,6 +105,13 @@ persistence:
   accessModes:
     - ReadWriteOnce
   size: 100Gi
+  # Disk sizing guidance (starting points; adjust by area and MAX_ZOOM):
+  # - Tiny demo:          50–100Gi
+  # - Small city/region:  100–200Gi
+  # - Medium country:     300–600Gi
+  # - Large region:       0.8–1.5Ti
+  # - Whole planet:       2–4Ti
+  # Prefer SSD-backed classes; ensure sufficient IOPS for faster builds.
   mountPath: /data
   annotations: {}
 

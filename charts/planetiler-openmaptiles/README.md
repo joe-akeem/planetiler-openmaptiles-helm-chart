@@ -2,7 +2,7 @@
 
 Helm chart to run https://github.com/openmaptiles/planetiler-openmaptiles as a Kubernetes Job.
 
-This chart builds OpenMapTiles with Planetiler and writes outputs to persistent storage. A new non-blocking Job is created on every `helm install` and `helm upgrade` (using the Helm release revision in the name). Helm returns immediately after creating the Job; Kubernetes runs it to completion. It supports configurable env vars/args, security contexts, resources, tolerations, node selectors, and PVCs.
+This chart builds OpenMapTiles with Planetiler and writes outputs to persistent storage. A new non-blocking Job is created on every `helm install` and `helm upgrade` (using the Helm release revision in the name). Helm returns immediately after creating the Job; Kubernetes runs it to completion. It supports configurable env vars/args, security contexts, resources, tolerations, node selectors, and PVCs. You can also disable Job creation entirely with `job.enabled=false` if you only want to provision supporting resources (e.g., the PVC) without running anything yet.
 
 ## Prerequisites
 - Kubernetes 1.21+ (Job `batch/v1`)
@@ -75,7 +75,42 @@ Common values you may want to set:
 - `args` default CLI flags, `area`, and `extraArgs`
 - `persistence.*` to configure the PVC and mount path (default mount `/data`)
 - `resources` for CPU/memory
+- `job.enabled` to disable/enable Job creation (default: true)
 - `job.*` options: `backoffLimit`, `activeDeadlineSeconds`, `ttlSecondsAfterFinished`, `annotations`, `labels`
+
+### Resource sizing recommendations
+Planetiler/OpenMapTiles is CPU and memory intensive, and disk usage scales with the area and `MAX_ZOOM`. The numbers below are conservative starting points; monitor your Job and adjust.
+
+- Tiny demo (very small areas like `monaco`, `liechtenstein`)
+  - requests: `cpu=2`, `memory=8Gi`; limits: `cpu=4`, `memory=16Gi`
+  - PVC size: 50–100Gi
+  - Example:
+    ```bash
+    helm install tiles ./ -n tiles --create-namespace \
+      --set area=monaco \
+      --set-json resources.requests='{ "cpu":"2", "memory":"8Gi" }' \
+      --set-json resources.limits='{ "cpu":"4", "memory":"16Gi" }' \
+      --set persistence.size=100Gi
+    ```
+- Small city/region (single city or small country)
+  - requests: `cpu=4`, `memory=16Gi`; limits: `cpu=8`, `memory=32Gi`
+  - PVC size: 100–200Gi
+- Medium country (e.g., CH, AT, BE)
+  - requests: `cpu=8`, `memory=32Gi`; limits: `cpu=16`, `memory=64Gi`
+  - PVC size: 300–600Gi
+- Large region/continent subset
+  - requests: `cpu=16`, `memory=64Gi`; limits: `cpu=32`, `memory=128Gi`
+  - PVC size: 0.8–1.5Ti
+- Whole planet (high zooms take much longer and require lots of RAM)
+  - requests: `cpu=32`, `memory=128Gi`; limits: `cpu=64`, `memory=256Gi`
+  - PVC size: 2–4Ti
+
+Tips:
+- If your cluster supports it, set requests equal to limits to run the Job with Guaranteed QoS and reduce eviction risk for this batch workload.
+- Ensure the target node has enough allocatable CPU/RAM to fit the Pod; use `nodeSelector`/`tolerations`/`affinity` to steer it to a suitably large node.
+- Prefer fast SSD-backed storage for the PVC.
+- If you hit `OOMKilled`, increase memory or reduce the zoom range via env vars (e.g., `env.MAX_ZOOM`) or CLI flags.
+- Disk usage and run time grow quickly with higher `MAX_ZOOM`. Reducing max zoom by 1–2 levels dramatically lowers resource needs.
 
 ### Example values.yaml
 ```yaml
@@ -110,6 +145,7 @@ persistence:
   mountPath: /data
 
 job:
+  enabled: true # set to false to disable creating/running the Job
   backoffLimit: 0
   activeDeadlineSeconds: null
   ttlSecondsAfterFinished: null
@@ -117,9 +153,17 @@ job:
   labels: {}
 ```
 
-### Deprecation notice about former CronJob settings
-- The chart previously created a `CronJob`, then a hook‑driven one‑off `Job`. It now creates a normal non‑blocking `Job` per install/upgrade (no Helm hooks).
-- Values under `cronjob.*` are ignored by the current templates. They are kept for backward compatibility for now and may be removed in a future major release.
+#### Disable the Job (optional)
+- Install without creating a Job (e.g., just create the PVC):
+  ```bash
+  helm install tiles ./ -n tiles --create-namespace \
+    --set job.enabled=false
+  ```
+- Enable and run the Job later on upgrade:
+  ```bash
+  helm upgrade tiles ./ -n tiles --reuse-values \
+    --set job.enabled=true
+  ```
 
 ### Persistence
 - By default, the chart creates a PVC named `<release>-planetiler-openmaptiles-data` and mounts it at `/data`.

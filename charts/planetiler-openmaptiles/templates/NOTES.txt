@@ -1,5 +1,6 @@
 Thank you for installing the planetiler-openmaptiles chart!
 
+{{- if .Values.job.enabled }}
 This chart runs a one-off Kubernetes Job on every install and upgrade. It is rendered as a normal resource (no Helm hooks), so Helm does not wait for it to finish.
 
 This chart creates:
@@ -30,3 +31,14 @@ Optional cleanup/retention:
 - Or leave it null to keep historical Jobs/Pods until you delete them manually.
 
 If you enabled persistence, outputs will be written under the mounted path inside the container (default {{ .Values.persistence.mountPath }}).
+{{- else }}
+Job creation is currently disabled (`job.enabled=false`).
+
+This release will only render supporting resources (like the PVC if configured). No Job will be created or run until you enable it.
+
+To enable and run the Job on the next upgrade:
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} -n {{ .Release.Namespace }} \
+    --reuse-values --set job.enabled=true
+
+If you enabled persistence, outputs will be written under the mounted path inside the container (default {{ .Values.persistence.mountPath }}) when the Job is enabled and executed.
+{{- end }}
